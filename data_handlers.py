@@ -83,13 +83,13 @@ def load_test_repos(input_file=None, limit=None, worker_index=0, total_workers=1
             # Load pre-computed weights: repos sorted heavy→light for balanced round-robin
             df = pd.read_csv(WEIGHTS_FILE)
             repos = df['repository'].tolist()  # already sorted by run_count desc
-            print(f"[*] Using repo_weights.csv for balanced assignment.")
+            print("[*] Using repo_weights.csv for balanced assignment.")
             
         elif os.path.exists(config.INPUT_FILE):
             # Fallback: random shuffle (no weight file yet)
             df = pd.read_csv(config.INPUT_FILE)
             repos = df['repository'].drop_duplicates().sample(frac=1.0, random_state=42).tolist()
-            print(f"[*] No repo_weights.csv found — using random assignment.")
+            print("[*] No repo_weights.csv found — using random assignment.")
             
         # 3. Missing Data - Friendly Error Message
         else:
@@ -103,7 +103,7 @@ def load_test_repos(input_file=None, limit=None, worker_index=0, total_workers=1
     if limit is not None:
         repos = repos[:limit]
 
-    print(f"[*] Loaded {len(repos)} unique valid repositories for processing.")
-    
+    print("[*] Loaded unique valid repositories for processing.")
+
     # Deal repos like a deck of cards: heavy repos spread evenly across workers
     return repos[worker_index::total_workers]

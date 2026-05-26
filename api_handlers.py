@@ -60,7 +60,7 @@ def handle_rate_limit(response, token=None, retry_count=0):
         else:
             # If we've retried 3 times and still getting 403 Secondary Limits, give up on this repo/page!
             if retry_count >= 3:
-                tqdm.write(f"       [!] Secondary limit persists after 3 retries. Skipping to avoid token ban.")
+                tqdm.write("[!] Secondary limit persists after 3 retries. Skipping to avoid token ban.")
                 with open('incomplete_data.log', 'a') as f:
                     f.write(f"{datetime.now().isoformat()},SECONDARY_LIMIT_ABORT,{response.url}\n")
                 return False # Break the loop, move on!
@@ -167,7 +167,8 @@ def fetch_runs_rest(repo, window_start, window_end,token):
                             new_name,  # new canonical name (from GitHub API)
                         ])
 
-            if not raw_runs: break
+            if not raw_runs: 
+                break
                 
             for r in raw_runs:
                 if r.get('status') == 'completed' and r['id'] not in seen_ids:
@@ -177,7 +178,9 @@ def fetch_runs_rest(repo, window_start, window_end,token):
                     if not oldest_timestamp_found or r['created_at'] < oldest_timestamp_found:
                         oldest_timestamp_found = r['created_at']
 
-            if len(raw_runs) < 100: break
+            if len(raw_runs) < 100: 
+                break
+
             page += 1
 
         if runs_in_this_window >= 1000 and oldest_timestamp_found:
@@ -199,7 +202,8 @@ def fetch_runs_rest(repo, window_start, window_end,token):
 # 3. GRAPHQL API: BATCHED FETCH
 # =============================================================================
 def fetch_jobs_and_steps_graphql(check_suite_node_ids, token):
-    if not check_suite_node_ids: return [], 0, 5000, True
+    if not check_suite_node_ids: 
+        return [], 0, 5000, True
         
     query = f"""
     query($runIds: [ID!]!) {{
@@ -350,7 +354,7 @@ def fetch_massive_run_rest(jobs_url, token):
                         headers=headers,
                         timeout=30
                     )
-                except requests.exceptions.RequestException as e:
+                except requests.exceptions.RequestException:
                     retries += 1
                     tqdm.write(f"       [!] Network error on page {page}, retry {retries}/{max_retries}")
                     if retries >= max_retries:

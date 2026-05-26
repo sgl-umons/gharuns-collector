@@ -56,7 +56,7 @@ def build_weights():
 
     weights.to_csv(OUTPUT_FILE, index=False)
     print(f"[*] Saved {len(weights):,} repos to {OUTPUT_FILE}")
-    print(f"\nTop 10 most active repos:")
+    print("\nTop 10 most active repos:")
     print(weights.head(10).to_string(index=False))
     print(f"\nRepos with 0 historical runs: {(weights['run_count'] == 0).sum():,}")
 

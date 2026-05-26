@@ -118,7 +118,8 @@ def main():
 
             with open(runs_file, 'r', encoding='utf-8') as f:
                 for line in f:
-                    if not line.strip(): continue
+                    if not line.strip():
+                        continue
                     run = json.loads(line)
                     run_date = run.get('created_at', '')[:10]
                     event = run.get('event', '')
@@ -183,9 +184,11 @@ def main():
                         
                         newly_done = []
                         for node in nodes:
-                            if not node: continue
+                            if not node: 
+                                continue
                             db_id = node.get('databaseId')
-                            if db_id in phase_b_done: continue
+                            if db_id in phase_b_done: 
+                                continue
                             check_runs_data = node.get('checkRuns', {})
                             jobs = check_runs_data.get('nodes', [])
                             
@@ -225,9 +228,11 @@ def main():
                 
                 newly_done = []
                 for node in nodes:
-                    if not node: continue
+                    if not node:
+                        continue
                     db_id = node.get('databaseId')
-                    if db_id in phase_b_done: continue  # optional dedup guard
+                    if db_id in phase_b_done: 
+                        continue  # optional dedup guard
                     check_runs_data = node.get('checkRuns', {})
                     jobs = check_runs_data.get('nodes', [])
                     
