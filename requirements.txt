@@ -1,0 +1,5 @@
+requests
+pandas
+tqdm
+python-dotenv
+glob
