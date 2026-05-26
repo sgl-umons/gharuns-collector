@@ -1,0 +1,27 @@
+# --- Data files (output, raw, state) ---
+*.jsonl
+*.csv
+*.csv.zst
+*.json
+*.txt
+*.log
+*.zst
+
+# states folder
+states/
+# data folder
+data/
+# reports folder
+reports/
+# raw data folder
+data-raw/
+# server data folder
+server_data/
+# notebooks folder
+notebooks/
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.env
