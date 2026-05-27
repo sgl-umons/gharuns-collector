@@ -1,36 +1,22 @@
 import json
-# from logging import config
 import os
 import fcntl
 from datetime import datetime, timedelta, timezone, date
 import config
 
 
-# =============================================================================
-# STATE SCHEMA
-# {
-#   "status": "in_progress" | "completed",
-#   "retention_day": "2026-01-16",   # the Phase B target date
-#   "cursor": "2026-01-18",          # last window_end fully fetched in Phase A
-#   "skip_phase_a": false,           # whether this run reuses existing runs.jsonl
-#   "phase_a_done_repos": [...],     # repos that finished Phase A this session
-#   "phase_b_done_runs": [...],      # integer databaseIds written to details.jsonl
-#   "phase_b_massive_runs": [...],   # databaseIds identified as massive (need REST crew)
-#   "run_url_lookup": {...}          # str(databaseId) -> jobs_url for massive runs
-# }
-# =============================================================================
+# This is the single source of truth for the pipeline's state machine. It tracks what has been completed, what still needs to be done, and whether we're resuming an interrupted run or starting fresh. The state is persisted to disk after every update, so the pipeline can be safely stopped and resumed without losing progress. The state file also serves as a checkpoint for the current retention window, ensuring that we don't accidentally start a new window before the old one is fully completed and its data is safely stored in the output files.
+
 
 def load_state():
-    """Load pipeline state from disk. Returns None if no state file exists."""
-    if not os.path.exists(config.STATE_FILE):  # USE config.STATE_FILE
+    if not os.path.exists(config.STATE_FILE):  
         return None
     with open(config.STATE_FILE, 'r') as f:
         return json.load(f)
 
 
 def save_state(state):
-    """Persist pipeline state atomically (safe against mid-write crashes)."""
-    tmp = config.STATE_FILE + ".tmp"  # USE config.STATE_FILE
+    tmp = config.STATE_FILE + ".tmp"  
     with open(tmp, 'w') as f:
         json.dump(state, f, indent=2)
     os.replace(tmp, config.STATE_FILE)
@@ -51,32 +37,26 @@ def _fresh_state(retention_day, window_end, skip_phase_a=False, total_shards=1):
 
 
 def resolve_startup(expected_repo_count=0, current_total_shards=1):
-    """
-    Determines what the current run should do based on existing state.
 
-    Returns:
-        (state, retention_day_str, window_end_str, skip_phase_a)
-        Returns (None, None, None, None) if already up to date — caller should exit.
-    """
     today = datetime.now(timezone.utc).date()
     new_retention_day = today - timedelta(days=config.RETENTION_DAYS)
     new_window_end = new_retention_day + timedelta(days=config.WINDOW_DAYS - 1)
 
     state = load_state()
 
-    # ── First ever run ────────────────────────────────────────────────────────
+    #  First ever run 
     if state is None:
         state = _fresh_state(new_retention_day, new_window_end, total_shards=current_total_shards)
         save_state(state)
         return state, str(new_retention_day), str(new_window_end), False
 
-    # ── Resume interrupted run ────────────────────────────────────────────────
+    #  Resume interrupted run 
     if state['status'] == 'in_progress':
         retention_day = state['retention_day']
         cursor = state['cursor']
         skip_phase_a = state.get('skip_phase_a', False)
 
-        # Guard: check if the saved retention_day has now fallen outside GraphQL's
+        # check if the saved retention_day has now fallen outside GraphQL's
         # 87-day retention window. This happens when e.g. the script was started on
         # day 87, crashed, and is resumed one or more days later.
         retention_day_date = date.fromisoformat(retention_day)
@@ -94,17 +74,17 @@ def resolve_startup(expected_repo_count=0, current_total_shards=1):
         print(f"[*] Resuming interrupted run for retention_day={retention_day}, skip_phase_a={skip_phase_a}")
         return state, retention_day, cursor, skip_phase_a
 
-    # ── Previous run completed ────────────────────────────────────────────────
+    #  Previous run completed 
     cursor = date.fromisoformat(state['cursor'])
     saved_retention_day = date.fromisoformat(state['retention_day'])
 
     if new_retention_day == saved_retention_day:
         
-        # NEW: Check if the user changed the shard count!
+        # Check if the user changed the shard count!
         saved_shards = state.get('total_shards', current_total_shards)
         
         if saved_shards == current_total_shards:
-            # Shard count is the same, so it's a genuine dataset expansion
+            # Shard count is the same, so it's the dataset expansion scenario.
             done_count = len(state.get('phase_a_done_repos', []))
             if done_count < expected_repo_count:
                 print(f"[*] Dataset expanded ({done_count} done, {expected_repo_count} expected). Resuming today's window.")
@@ -123,20 +103,15 @@ def resolve_startup(expected_repo_count=0, current_total_shards=1):
             print(f"[*] Next window ({next_retention_day}) is in the grace period...")
             return None, None, None, None
 
-        # NEW: Pass current_total_shards to the next window
         state = _fresh_state(next_retention_day, next_window_end, total_shards=current_total_shards)
         save_state(state)
         return state, str(next_retention_day), str(next_window_end), False
         
-    # Full run with a fresh window
     state = _fresh_state(new_retention_day, new_window_end, skip_phase_a=False, total_shards=current_total_shards)
     save_state(state)
     return state, str(new_retention_day), str(new_window_end), False
 
 
-# =============================================================================
-# PROGRESS TRACKING
-# =============================================================================
 
 def _summary_file():
     return os.path.join(config.STATE_DIR, "pipeline_summary.json")
@@ -168,21 +143,16 @@ def _write_summary_locked(update_fn):
 
 
 def record_window_start(shard_idx, retention_day_str, window_end_str):
-    """
-    Called once at the start of a fresh window (not on resume).
-    - Appends an IN_PROGRESS line to the per-shard progress log.
-    - Adds a placeholder entry to the cross-shard summary JSON.
-    """
+
     now = datetime.now(timezone.utc).isoformat(timespec='seconds')
     window_key = f"{retention_day_str}_{window_end_str}"
     shard_key = f"w{shard_idx}"
 
-    # Per-shard append log (easy to tail)
+    # Per-shard append log 
     log_file = os.path.join(config.STATE_DIR, f"progress_shard_{shard_idx}.log")
     with open(log_file, 'a') as f:
         f.write(f"[{now}] {retention_day_str} --> {window_end_str} | IN_PROGRESS\n")
 
-    # Cross-shard summary — only add placeholder if entry doesn't exist yet
     def update(summary):
         if window_key not in summary:
             summary[window_key] = {}
@@ -193,14 +163,7 @@ def record_window_start(shard_idx, retention_day_str, window_end_str):
 
 
 def record_window_complete(shard_idx, retention_day_str, window_end_str, stats):
-    """
-    Called when a window completes successfully.
-    - Appends a COMPLETED line to the per-shard progress log.
-    - Writes full stats to the cross-shard summary JSON.
 
-    stats keys: duration_h, repos, runs_discovered, runs_graphql, runs_rest_crew,
-                jobs, steps, rest_calls, gql_pts
-    """
     now = datetime.now(timezone.utc).isoformat(timespec='seconds')
     window_key = f"{retention_day_str}_{window_end_str}"
     shard_key = f"w{shard_idx}"
