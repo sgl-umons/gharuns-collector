@@ -6,7 +6,7 @@ import config
 
 
 def setup_environment():
-    """Prepares the output directory for a new window."""
+
     print("[*] Setting up output directories...")
     os.makedirs(config.OUTPUT_DIR, exist_ok=True)
     os.makedirs(config.REPORT_DIR, exist_ok=True)
