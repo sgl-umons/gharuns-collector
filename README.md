@@ -18,40 +18,49 @@ flowchart LR
     classDef decision fill:#fff9c4,stroke:#fbc02d,stroke-width:3px,font-size:16px,padding:10px;
     classDef endpoint fill:#374151,color:#fff,stroke:#374151,stroke-width:3px,font-size:18px,font-weight:bold,padding:15px;
 
-    A(["Start"]) ::: endpoint --> B["Load Repository List"] ::: core
-    B --> C["Resolve Time Window\nfrom state file"] ::: core
-    C --> D{"Within grace\nperiod?"} ::: decision
-    D -- Yes --> Z(["End"]) ::: endpoint
-    D -- No --> E{"Phase A\nalready complete?"} ::: decision
+    %% Nodes and Connections
+    A(["Start"]) --> B["Load Repository List"]
+    B --> C["Resolve Time Window\nfrom state file"]
+    C --> D{"Within grace\nperiod?"}
+    D -- Yes --> Z(["End"])
+    D -- No --> E{"Phase A\nalready complete?"}
     
-    E -- No --> F["Phase A — REST Discovery"] ::: phaseA
-    F --> G["Query REST API\nfor completed runs"] ::: phaseA
-    G --> H["Filter & save runs\nto runs.jsonl"] ::: phaseA
-    H --> I["Enqueue check suite IDs\ninto GraphQL buffer"] ::: phaseA
-    I --> J{"GraphQL buffer\nfull?"} ::: decision
+    E -- No --> F["Phase A — REST Discovery"]
+    F --> G["Query REST API\nfor completed runs"]
+    G --> H["Filter & save runs\nto runs.jsonl"]
+    H --> I["Enqueue check suite IDs\ninto GraphQL buffer"]
+    I --> J{"GraphQL buffer\nfull?"}
     
-    J -- Yes --> K["Phase B — GraphQL Enrichment"] ::: phaseB
+    J -- Yes --> K["Phase B — GraphQL Enrichment"]
     J -- No, next repo --> F
     
     E -- Yes --> K
-    K --> L["Batch-query jobs & steps\nvia GraphQL API"] ::: phaseB
-    L --> M{"Run exceeds\nGraphQL page limits?"} ::: decision
-    M -- No --> N["Write jobs & steps\nto details.jsonl"] ::: phaseB
-    M -- Yes --> O["Add to massive\nruns buffer"] ::: phaseB
+    K --> L["Batch-query jobs & steps\nvia GraphQL API"]
+    L --> M{"Run exceeds\nGraphQL page limits?"}
+    M -- No --> N["Write jobs & steps\nto details.jsonl"]
+    M -- Yes --> O["Add to massive\nruns buffer"]
     
-    N --> P{"More runs\nin GraphQL buffer?"} ::: decision
+    N --> P{"More runs\nin GraphQL buffer?"}
     O --> P
     P -- Yes --> L
-    P -- No --> Q{"Any massive runs\nin buffer?"} ::: decision
+    P -- No --> Q{"Any massive runs\nin buffer?"}
     
-    Q -- No --> U["Save report &\ncheckpoint state"] ::: core
-    Q -- Yes --> R["Phase C — REST Cleanup Crew"] ::: phaseC
-    R --> S["Fetch full jobs & steps\nvia REST API"] ::: phaseC
-    S --> T["Write to details.jsonl"] ::: phaseC
+    Q -- No --> U["Save report &\ncheckpoint state"]
+    Q -- Yes --> R["Phase C — REST Cleanup Crew"]
+    R --> S["Fetch full jobs & steps\nvia REST API"]
+    S --> T["Write to details.jsonl"]
     T --> U
     
-    U --> V{"More windows\nto process?"} ::: decision
+    U --> V{"More windows\nto process?"}
     V -- Yes --> C
     V -- No --> Z
+
+    %% Apply Classes Safely
+    class A,Z endpoint;
+    class B,C,U core;
+    class D,E,J,M,P,Q,V decision;
+    class F,G,H,I phaseA;
+    class K,L,N,O phaseB;
+    class R,S,T phaseC;
 
 ```
