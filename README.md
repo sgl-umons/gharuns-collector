@@ -7,5 +7,3 @@
 [![Last Commit](https://img.shields.io/github/last-commit/aref98/GHA_run_metadata)](https://github.com/aref98/GHA_run_metadata/commits/main)
 
 A fault-tolerant, large-scale data extraction pipeline designed to collect massive datasets of GitHub Actions workflow runs, jobs, steps, and annotations. This tool was developed for the **ICSME 2026 Data Track** to support empirical research on CI/CD reliability and maintainability.
-
-![Activity Diagram](docs/activity_diagram2.png) 
