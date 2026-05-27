@@ -9,7 +9,7 @@
 A large-scale data extraction pipeline designed to collect massive datasets of GitHub Actions workflow runs, jobs, steps. This tool was developed for the **ICSME 2026 Data Track** to support empirical research on CI/CD reliability and maintainability.
 
 ## Overview and Architecture
-Mining GitHub Actions workflows run metadata at scale is severely constrained by GitHub's strict rate limits and rolling log retention policies. To overcome this, this tool utilizes an optimized **two-phase extraction architecture** (with a REST-based cleanup phase for edge cases) combined with a forward-progressing sliding window.
+Mining GitHub Actions workflows run metadata at scale is severely constrained by GitHub's strict rate limits and rolling log retention policies. To overcome this, this tool utilizes an optimized **two-phase extraction architecture** with a REST fallback cleanup phase for edge cases. 
 
 <p align="center">
   <img src="docs/activity_diagram6.svg" alt="Activity diagram of GHARuns_Collector" width="1200">
@@ -27,14 +27,14 @@ The pipeline (illustrated in Figure 1) operates in three sequential phases per t
 
 **Phase C — REST Cleanup Crew:** A small fraction of workflow runs (~1%) contain so many jobs or steps that they cannot be fully retrieved through GraphQL. These "massive runs" are fetched individually via the REST API (`/actions/jobs`), using a two-attempt dynamic resizing strategy (100 jobs/page, falling back to 10 jobs/page on payload errors). Their output is normalized into the same structure as Phase B results and written to the same `details.jsonl` file, ensuring complete coverage.
 
-We tried to make the pipeline fully fault-tolerant: progress is checkpointed to a state file after every repository and every GraphQL batch, so execution can be safely interrupted and resumed at any point without data loss or duplicate API calls.
+The pipeline is designed to be fault-tolerant. Progress is checkpointed to a state file after every repository and every GraphQL batch, so execution can be safely interrupted and resumed at any point without data loss or duplicate API calls.
 
 ## Installation
 Clone the repository and install the required dependencies:
 
 ```bash
-git clone https://github.com/sgl-umons/GHA_run_metadata.git
-cd GHA_run_metadata
+git clone https://github.com/sgl-umons/gharuns-collector.git
+cd gharuns-collector
 pip install -r requirements.txt
 ```
 
