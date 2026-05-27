@@ -9,5 +9,5 @@
 A large-scale data extraction pipeline designed to collect massive datasets of GitHub Actions workflow runs, jobs, steps. This tool was developed for the **ICSME 2026 Data Track** to support empirical research on CI/CD reliability and maintainability.
 
 <p align="center">
-  <img src="docs/activity_diagram5.svg" alt="Activity diagram" width="600" hight="800">
+  <img src="docs/activity_diagram5.svg" alt="Activity diagram" width="300" hight="400">
 </p>
