@@ -14,17 +14,14 @@ def _clean_repo_name(repo_str):
     if not repo_str:
         return None
         
-    # Strip trailing .git if present
     if repo_str.endswith('.git'):
         repo_str = repo_str[:-4]
         
-    # Handle full URLs (e.g., https://github.com/aref98/nodejs-rest-api)
     if 'github.com/' in repo_str:
         parts = repo_str.split('github.com/')[-1].split('/')
         if len(parts) >= 2:
             return f"{parts[0]}/{parts[1]}"
             
-    # Validate it is in standard owner/repo format (must contain exactly one slash)
     if repo_str.count('/') == 1:
         return repo_str
         
@@ -78,6 +75,9 @@ def load_test_repos(input_file=None, limit=None, worker_index=0, total_workers=1
             sys.exit(1)
             
     # 2. Default Logic (Original Behavior)
+    # This is our original logic for loading repos from Cardoen et al.'s workflows.csv.zst, with the new addition of using repo_weights.csv if it exists. 
+    # --- USE THIS --- if you want to use the default list of repos from workflows.csv.zst, with optional weighting from repo_weights.csv.
+    # --- IGNORE --- if you want to use your own list of repos. 
     else:
         if os.path.exists(WEIGHTS_FILE):
             # Load pre-computed weights: repos sorted heavy→light for balanced round-robin
