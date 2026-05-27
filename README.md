@@ -9,7 +9,7 @@
 A large-scale data extraction pipeline designed to collect massive datasets of GitHub Actions workflow runs, jobs, steps. This tool was developed for the **ICSME 2026 Data Track** to support empirical research on CI/CD reliability and maintainability.
 
 ## Overview and Architecture
-Mining GitHub Actions workflows run metadata at scale is severely constrained by GitHub's strict rate limits and rolling log retention policies. To overcome this, this tool utilizes an optimized **Two-Phase Extraction Architecture** combined with a forward-progressing sliding window.
+Mining GitHub Actions workflows run metadata at scale is severely constrained by GitHub's strict rate limits and rolling log retention policies. To overcome this, this tool utilizes an optimized **two-phase extraction architecture** (with a REST-based cleanup phase for edge cases) combined with a forward-progressing sliding window.
 
 <p align="center">
   <img src="docs/activity_diagram6.svg" alt="Activity diagram of GHARuns_Collector" width="1200">
