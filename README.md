@@ -18,3 +18,19 @@ Mining GitHub Actions workflows run metadata at scale is severely constrained by
 <p align="center">
   <em>Figure 1: High-level activity diagram of the GHARuns_Collector pipeline</em>
 </p>
+
+/// explanations of the diagram ///
+
+
+
+
+## Installation
+Clone the repository and install the required dependencies:
+
+```bash
+git clone https://github.com/sgl-umons/GHA_run_metadata.git
+cd GHA_run_metadata
+pip install -r requirements.txt
+```
+
+## Usage
