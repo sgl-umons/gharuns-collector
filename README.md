@@ -8,7 +8,7 @@
 
 A fault-tolerant, large-scale data extraction pipeline designed to collect massive datasets of GitHub Actions workflow runs, jobs, steps, and annotations. This tool was developed for the **ICSME 2026 Data Track** to support empirical research on CI/CD reliability and maintainability.
 
-![Activity Diagram](docs/activity_diagram.png) 
+![Activity Diagram](docs/activity_diagram1.png) 
 
 
 ```mermaid
