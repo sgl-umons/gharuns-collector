@@ -8,7 +8,7 @@
 
 A fault-tolerant, large-scale data extraction pipeline designed to collect massive datasets of GitHub Actions workflow runs, jobs, steps, and annotations. This tool was developed for the **ICSME 2026 Data Track** to support empirical research on CI/CD reliability and maintainability.
 
-![Activity Diagram](docs/activity_diagram2.png) 
+
 
 
 ```mermaid
@@ -19,7 +19,7 @@ flowchart TD
     classDef phaseB fill:#e8f5e9,stroke:#388e3c,stroke-width:3px,font-size:10px,padding:10px;
     classDef phaseC fill:#fff8e1,stroke:#f57c00,stroke-width:3px,font-size:10px,padding:10px;
     classDef decision fill:#fff9c4,stroke:#fbc02d,stroke-width:3px,font-size:10px,padding:10px;
-    classDef endpoint fill:#374151,color:#fff,stroke:#374151,stroke-width:3px,font-size:18px,font-weight:bold,padding:15px;
+    classDef endpoint fill:#374151,color:#fff,stroke:#374151,stroke-width:3px,font-size:8px,font-weight:bold,padding:15px;
 
     %% Initial Steps
     A(["Start"]) --> B["Load Repository List"]
