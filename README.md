@@ -10,12 +10,11 @@ A large-scale data extraction pipeline designed to collect massive datasets of G
 
 ```mermaid
 flowchart LR
-    %% Define the Color Palette with larger fonts and padding
-    classDef core fill:#f3f4f6,stroke:#9e9e9e,stroke-width:3px,font-size:16px,padding:10px;
-    classDef phaseA fill:#e3f2fd,stroke:#0288d1,stroke-width:3px,font-size:16px,padding:10px;
-    classDef phaseB fill:#e8f5e9,stroke:#388e3c,stroke-width:3px,font-size:16px,padding:10px;
-    classDef phaseC fill:#fff8e1,stroke:#f57c00,stroke-width:3px,font-size:16px,padding:10px;
-    classDef decision fill:#fff9c4,stroke:#fbc02d,stroke-width:3px,font-size:16px,padding:10px;
+    classDef core fill:#f3f4f6,stroke:#9e9e9e,stroke-width:3px,font-size:26px,padding:10px;
+    classDef phaseA fill:#e3f2fd,stroke:#0288d1,stroke-width:3px,font-size:26px,padding:10px;
+    classDef phaseB fill:#e8f5e9,stroke:#388e3c,stroke-width:3px,font-size:26px,padding:10px;
+    classDef phaseC fill:#fff8e1,stroke:#f57c00,stroke-width:3px,font-size:26px,padding:10px;
+    classDef decision fill:#fff9c4,stroke:#fbc02d,stroke-width:3px,font-size:26px,padding:10px;
     classDef endpoint fill:#374151,color:#fff,stroke:#374151,stroke-width:3px,font-size:18px,font-weight:bold,padding:15px;
 
     %% Nodes and Connections
