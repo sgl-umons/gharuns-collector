@@ -3,10 +3,6 @@ from dotenv import load_dotenv
 load_dotenv()     
 
 INPUT_FILE = './data-raw/workflows.csv.zst'
-# GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
-
-# if not GITHUB_TOKEN:
-#     raise ValueError("GITHUB_TOKEN is missing! Check your .env file.")
 
 GITHUB_TOKEN = None 
 
