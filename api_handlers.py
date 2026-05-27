@@ -13,8 +13,8 @@ def _log_rate_limit_event(event_type, response, sleep_sec, token):
     reset_ts = int(response.headers.get("X-RateLimit-Reset", 0))
     reset_at = datetime.fromtimestamp(reset_ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if reset_ts else "unknown"
     row = [
-        datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),   # timestamp
-        token_hint,                                       # which worker (safe)
+        datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),   
+        token_hint,                                       
         event_type,                                       # HARD_403 / HARD_429 / NEAR_LIMIT
         response.status_code,                             # raw HTTP status
         response.headers.get("X-RateLimit-Resource", "unknown"),  # core / graphql / search
@@ -29,7 +29,6 @@ def _log_rate_limit_event(event_type, response, sleep_sec, token):
 
 
 def handle_rate_limit(response, token=None, retry_count=0):
-    """Checks if we hit a limit, and sleeps if necessary. Uses exponential backoff for secondary limits."""
     
     if response.status_code == 403 or response.status_code == 429:
         
@@ -91,16 +90,14 @@ def handle_rate_limit(response, token=None, retry_count=0):
     return False
 
 
-# =============================================================================
-# 2. REST API: DISCOVERY 
-# =============================================================================
+
 def fetch_runs_rest(repo, window_start, window_end,token):
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github.v3+json"}
     all_runs = []
     seen_ids = set()
     current_window_end = f"{window_end}T23:59:59Z"
     
-    # Emergency fail-safe
+    # fail-safe
     max_sliding_loops = 50 
     loop_count = 0
 
@@ -126,18 +123,17 @@ def fetch_runs_rest(repo, window_start, window_end,token):
                 except requests.exceptions.RequestException as e:
                     net_errors += 1
                     if net_errors >= 3:
-                        tqdm.write(f"       [!] Network Exception in fetch_runs_rest: {type(e).__name__}. Skipping page.")
+                        tqdm.write(f"  [!] Network Exception in fetch_runs_rest: {type(e).__name__}. Skipping page.")
                         break
-                    tqdm.write(f"       [!] Network Exception in fetch_runs_rest: {type(e).__name__}. Retrying in 5s...")
+                    tqdm.write(f" [!] Network Exception in fetch_runs_rest: {type(e).__name__}. Retrying in 5s...")
                     time.sleep(5)
                     continue
                 
-                # Pass the rate limit retry counter
                 if handle_rate_limit(response, token, retry_count=rl_retries):
-                    rl_retries += 1  # Increment the rate limit retry counter!
-                    continue # We slept, try the exact same request again
+                    rl_retries += 1 
+                    continue 
                     
-                break # Not a retryable rate limit, proceed
+                break 
 
             if response is None:
                 tqdm.write(f"      *** WARNING: fetch_runs_rest aborted for {repo} on page {page}. Run list is INCOMPLETE. ***")
@@ -145,7 +141,6 @@ def fetch_runs_rest(repo, window_start, window_end,token):
                     f.write(f"{datetime.now().isoformat()},DISCOVERY,{repo},{window_start}_to_{current_window_end},failed_on_page_{page}\n")
                 break
 
-            # --- NEW: HEARTBEAT ERROR LOGGING ---
             if response.status_code != 200: 
                 tqdm.write(f"       [!] API 1 Error: {response.status_code} for {repo}")
                 with open('incomplete_data.log', 'a') as f:
@@ -163,8 +158,8 @@ def fetch_runs_rest(repo, window_start, window_end,token):
                     with open(config.REDIRECT_LOG_FILE, 'a', newline='') as _rlog:
                         csv.writer(_rlog).writerow([
                             datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-                            repo,      # old name (from CSV / input)
-                            new_name,  # new canonical name (from GitHub API)
+                            repo,      
+                            new_name,  
                         ])
 
             if not raw_runs: 
@@ -184,7 +179,6 @@ def fetch_runs_rest(repo, window_start, window_end,token):
             page += 1
 
         if runs_in_this_window >= 1000 and oldest_timestamp_found:
-            # FIXED: Step back exactly 1 second to absolutely prevent an infinite loop!
             dt = datetime.strptime(oldest_timestamp_found, "%Y-%m-%dT%H:%M:%SZ")
             new_dt = dt - timedelta(seconds=1)
             current_window_end = new_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -198,9 +192,7 @@ def fetch_runs_rest(repo, window_start, window_end,token):
             f.write(f"{datetime.now().isoformat()},SLIDING_WINDOW_FAILSAFE,{repo},collected_{len(all_runs)}_runs_truncated\n")
 
     return all_runs
-# =============================================================================
-# 3. GRAPHQL API: BATCHED FETCH
-# =============================================================================
+
 def fetch_jobs_and_steps_graphql(check_suite_node_ids, token):
     if not check_suite_node_ids: 
         return [], 0, 5000, True
@@ -227,12 +219,10 @@ def fetch_jobs_and_steps_graphql(check_suite_node_ids, token):
     """
     
     headers = {"Authorization": f"Bearer {token}"}
-    # Only genuine connection errors consume the retry budget.
-    # Rate limit sleeps do not count against retries.
+
     connection_errors = 0
     max_connection_retries = 3
-    rl_retries = 0  # NEW: Track rate limit retries specifically for this batch
-
+    rl_retries = 0 
     while connection_errors < max_connection_retries: 
         batch_start_time = time.time()
         try:
@@ -257,7 +247,7 @@ def fetch_jobs_and_steps_graphql(check_suite_node_ids, token):
                 if "errors" in json_data and any(e.get("type") == "RATE_LIMITED" for e in json_data["errors"]):
                     tqdm.write("       [!] GraphQL RATE LIMIT HIT (inside 200 OK). Sleeping 60s...")
                     time.sleep(60)
-                    continue  # rate limit: do not count against retries
+                    continue  
 
                 data = json_data.get('data') or {}
                 cost = data.get('rateLimit', {}).get('cost', 0)
@@ -322,7 +312,7 @@ def fetch_with_dynamic_resizing(batch_ids, token):
         tqdm.write(f"       Split result for {len(batch_ids)} runs: recovered {recovered}/{len(batch_ids)} nodes.")
         return combined, cost1 + cost2, min(rem1, rem2)
         
-    # NEW: If it failed and length is exactly 1, SKIP IT to prevent infinite loop.
+    # If it failed and length is exactly 1, SKIP IT to prevent infinite loop.
     else:
         tqdm.write(f"   [!] PERMANENT FAILURE: Skipping un-fetchable run ID {batch_ids[0]}")
         # Log this skipped ID to a file so you can investigate it later!
@@ -331,7 +321,18 @@ def fetch_with_dynamic_resizing(batch_ids, token):
         return [], 0, remaining
     
 def fetch_massive_run_rest(jobs_url, token):
-    """Uses the REST API to fetch 100% of the jobs and steps for massive runs."""
+
+    """
+    Uses the REST API to fetch all of the jobs and steps for massive runs.
+       This is our cleaning crew for runs that exceed GraphQL's complexity limits and cause timeouts or 502/504 errors.
+       It implements a two-pass dynamic resizing strategy:
+       1. First attempt: per_page=100 to fetch quickly if the payload is manageable
+       2. If it fails on page 1 or 2 with a timeout or 502/504, we assume it's a payload size issue and restart with per_page=10 to reduce the load per request and increase chances of success.
+       3. If it fails deep into pagination (e.g., page 15), we assume it's a different issue and do not restart, just log and return whatever we got to avoid infinite loops.
+       All failures and retries are logged for post-hoc analysis, and we keep track of how many jobs we managed to fetch before failure to understand the severity of the issue.
+       
+        ** For anyone wondering why we even have this function: some runs are so massive that they cause GraphQL timeouts or 502/504 errors, and we can't fetch their jobs/steps at all through GraphQL. This REST-based "cleaning crew" function is our workaround for those edge cases, allowing us to still get partial data instead of losing the entire run. **
+    """
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github.v3+json"}
     
     # We define a helper so we can easily restart with a smaller per_page if needed.
@@ -394,7 +395,6 @@ def fetch_massive_run_rest(jobs_url, token):
         
         return True, all_jobs, page, None
 
-    # --- EXECUTION STRATEGY ---
     
     # Attempt 1: Fast lane (100 jobs per page)
     success, jobs, failed_page, err = attempt_fetch(100)
