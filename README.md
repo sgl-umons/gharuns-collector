@@ -117,15 +117,15 @@ If you use this tool or the accompanying dataset in your research, please cite o
 
 ```bibtex
 
-@misc{Talebzadeh2026-ICSME,
-      title={On the GitHub Actions Language: Usage, Evolution, and Workflow Reliability}, 
+@inproceedings{Talebzadeh2026-ICSME,
+      title={On the {GitHub Actions} Language: Usage, Evolution, and Workflow Reliability}, 
       author={Aref Talebzadeh Bardsiri and Alexandre Decan and Tom Mens},
       year={2026},
-      eprint={2605.26825},
-      archivePrefix={arXiv},
-      primaryClass={cs.SE},
-      url={https://arxiv.org/abs/2605.26825}, 
+	  booktitle = {International Conference on Software Maintenance and Evolution ({ICSME})},
+	  note = {To appear},
+	  publisher={IEEE}
 }
+
 
 ```
 
