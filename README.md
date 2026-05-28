@@ -6,7 +6,7 @@
 [![License: LGPL v3](https://img.shields.io/badge/License-LGPL%20v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 [![Last Commit](https://img.shields.io/github/last-commit/aref98/GHA_run_metadata)](https://github.com/aref98/GHA_run_metadata/commits/main)
 
-A large-scale data extraction pipeline designed to collect massive datasets of GitHub Actions workflow runs, jobs, steps. This tool was developed for the **ICSME 2026 Data Track** to support empirical research on CI/CD reliability and maintainability.
+A large-scale data extraction pipeline designed to collect massive datasets (GHARuns) of GitHub Actions workflow runs, jobs, steps. This tool was developed for the **ICSME 2026 Data Track** to support empirical research on CI/CD reliability and maintainability.
 
 ## Overview and Architecture
 Mining GitHub Actions workflows run metadata at scale is severely constrained by GitHub's strict rate limits and rolling log retention policies. To overcome this, this tool utilizes an optimized **two-phase extraction architecture** (with a REST-based cleanup phase for edge cases) combined with a forward-progressing sliding window.
@@ -16,7 +16,7 @@ Mining GitHub Actions workflows run metadata at scale is severely constrained by
 </p>
 
 <p align="center">
-  <em>Figure 1: High-level activity diagram of the GHARuns_Collector pipeline</em>
+  <em>Figure 1: High-level activity diagram of the GHARuns Collector pipeline</em>
 </p>
 
 The pipeline (illustrated in Figure 1) operates in three sequential phases per time window:
