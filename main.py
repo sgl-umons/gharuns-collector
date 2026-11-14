@@ -7,6 +7,7 @@ from tqdm import tqdm
 from environment_setup import setup_environment, diag_start_window, diag_end_window
 import config
 from data_handlers import load_test_repos
+import api_handlers
 from api_handlers import fetch_massive_run_rest, fetch_runs_rest, fetch_with_dynamic_resizing
 from state_manager import resolve_startup, save_state, record_window_start, record_window_complete
 
@@ -15,7 +16,7 @@ def parse_args():
     parser.add_argument('--worker', type=str, default="0/1", help="e.g. 0/3, 1/3, 2/3")
     parser.add_argument('--token', type=str, required=True, help="GitHub PAT")
     parser.add_argument('--test', type=int, default=None, help="Limit number of repos for testing")
-    parser.add_argument('--input', type=str,required=True, help="Path to a custom CSV or TXT file containing repositories")
+    parser.add_argument('--input', type=str, default=None, help="Path to a custom CSV or TXT file containing repositories (default: repo_weights.csv, else the dataset in config.INPUT_FILE)")
     return parser.parse_args()
     
 
@@ -71,8 +72,9 @@ def main():
         total_steps_fetched = 0
         total_graphql_cost = 0
         total_rest_discovery_calls = 0  
-        total_rest_crew_calls = 0 
-        
+        total_rest_crew_calls = 0
+        total_graphql_degraded_responses = 0
+
         graphql_buffer = []  
         massive_runs_buffer = []  
         run_url_lookup = {}
@@ -81,6 +83,10 @@ def main():
 
         phase_a_done = set(state['phase_a_done_repos'])
         phase_b_done = set(state['phase_b_done_runs'])
+        # Runs already identified as massive (saved in state, fetched later by the REST cleanup
+        # crew). On a mid-repo resume the repo is re-discovered; without this they would be sent
+        # through GraphQL again — and they are exactly the heavy runs that time out (502).
+        known_massive = set(state.get('phase_b_massive_runs', []))
 
         print(f"\n[*] Process started... retention_day={retention_day_str}, skip_phase_a={skip_phase_a}")
 
@@ -164,18 +170,33 @@ def main():
                         
                         if event not in ['pull_request', 'pull_request_target'] and node_id:
                             db_id = run.get('check_suite_id')
-                            if db_id and db_id not in phase_b_done:
+                            if db_id and db_id not in phase_b_done and db_id not in known_massive:
                                 graphql_buffer.append(node_id)
                                 run_url_lookup[str(db_id)] = run.get('jobs_url')
-                    
+
                     # 2. DETAILS (interleaved)
-                    while len(graphql_buffer) >= config.GRAPHQL_BATCH_SIZE:
-                        batch_to_send = graphql_buffer[:config.GRAPHQL_BATCH_SIZE]
-                        graphql_buffer = graphql_buffer[config.GRAPHQL_BATCH_SIZE:]
-                        
+                    # Adaptive batch size (per repo): heavy repos time out (502) at 10 runs per
+                    # query far more often than at 2. Halve after a failed batch, double back
+                    # after 30 clean batches. Same query, same data — only the request size.
+                    batch_size = config.GRAPHQL_BATCH_SIZE
+                    clean_streak = 0
+                    while len(graphql_buffer) >= batch_size:
+                        batch_to_send = graphql_buffer[:batch_size]
+                        graphql_buffer = graphql_buffer[batch_size:]
+
                         total_runs_sent_to_graphql += len(batch_to_send)
-                        nodes, cost, remaining = fetch_with_dynamic_resizing(batch_to_send, args.token)
+                        fails_before = api_handlers.GQL_FAILED_ATTEMPTS
+                        nodes, cost, remaining, gql_errors = fetch_with_dynamic_resizing(batch_to_send, args.token)
+                        if api_handlers.GQL_FAILED_ATTEMPTS > fails_before:
+                            batch_size = max(2, batch_size // 2)
+                            clean_streak = 0
+                        else:
+                            clean_streak += 1
+                            if clean_streak >= 30 and batch_size < config.GRAPHQL_BATCH_SIZE:
+                                batch_size = min(config.GRAPHQL_BATCH_SIZE, batch_size * 2)
+                                clean_streak = 0
                         total_graphql_cost += cost
+                        total_graphql_degraded_responses += gql_errors
                         
                         newly_done = []
                         for node in nodes:
@@ -218,8 +239,9 @@ def main():
             # 3. Final flush (handles skip_phase_a buffer too)
             if len(graphql_buffer) > 0:
                 total_runs_sent_to_graphql += len(graphql_buffer)
-                nodes, cost, remaining = fetch_with_dynamic_resizing(graphql_buffer, args.token)
+                nodes, cost, remaining, gql_errors = fetch_with_dynamic_resizing(graphql_buffer, args.token)
                 total_graphql_cost += cost
+                total_graphql_degraded_responses += gql_errors
                 
                 newly_done = []
                 for node in nodes:
@@ -328,6 +350,7 @@ def main():
     - Total REST API Calls Used:    {total_rest_calls:,} calls
         - Discovery Phase:            {total_rest_discovery_calls:,} calls
         - Cleanup Crew Phase:         {total_rest_crew_calls:,} calls
+    - GraphQL Degraded Responses:   {total_graphql_degraded_responses:,} (200 OK with rateLimit missing - batch retried/split)
     {'='*30}
     """
 
@@ -351,6 +374,7 @@ def main():
             'steps': total_steps_fetched,
             'rest_calls': total_rest_calls,
             'gql_pts': total_graphql_cost,
+            'gql_degraded_responses': total_graphql_degraded_responses,
         })
 
         # Mark this run as fully completed

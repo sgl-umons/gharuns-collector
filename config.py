@@ -1,6 +1,8 @@
+import os
+
 from dotenv import load_dotenv
 
-load_dotenv()     
+load_dotenv()
 
 INPUT_FILE = './data-raw/workflows.csv.zst'
 
@@ -16,7 +18,8 @@ GRAPHQL_BATCH_SIZE = 10
 GQL_JOBS_LIMIT = 35
 GQL_STEPS_LIMIT = 26
 
-OUTPUT_DIR = "data"
+# Where runs_/details_ JSONL files are written. Override with OUTPUT_DIR=... in .env
+OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "data")
 STATE_DIR = "states"
 REPORT_DIR = "reports"
 

@@ -66,7 +66,7 @@ The pipeline will automatically determine the correct 7-day collection window, r
 | Argument | Required | Default | Description |
 |---|---|---|---|
 | `--token` | Yes | — | GitHub Personal Access Token (PAT) with `repo` and `workflow` read scopes |
-| `--input` | Yes | — | Path to a `.csv` or `.txt` file containing the target repositories |
+| `--input` | No | `repo_weights.csv`, else `data-raw/workflows.csv.zst` | Path to a `.csv` or `.txt` file containing the target repositories. If omitted, the default dataset is used (and a friendly error is shown if neither file exists) |
 | `--worker` | No | `0/1` | Shard assignment in `index/total` format (e.g. `1/3` for the second of three workers) |
 | `--test` | No | `None` | Limit the number of repositories processed — useful for smoke-testing |
 
@@ -74,6 +74,8 @@ The pipeline will automatically determine the correct 7-day collection window, r
 - `.csv` — must have a `repository` column (or repository names as the first column)
 - `.txt` — one `owner/repo` per line, or comma-separated on a single line
 - Full GitHub URLs (e.g. `https://github.com/owner/repo`) are also accepted and normalized automatically
+
+**Output directory:** run/detail JSONL files are written to `data/` by default. Set `OUTPUT_DIR=<folder>` in the `.env` file to write elsewhere.
 
 ## Examples
 

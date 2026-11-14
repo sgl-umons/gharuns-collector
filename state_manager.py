@@ -167,6 +167,7 @@ def record_window_complete(shard_idx, retention_day_str, window_end_str, stats):
     now = datetime.now(timezone.utc).isoformat(timespec='seconds')
     window_key = f"{retention_day_str}_{window_end_str}"
     shard_key = f"w{shard_idx}"
+    gql_degraded_responses = stats.get('gql_degraded_responses', 0)
 
     # Per-shard append log
     log_file = os.path.join(config.STATE_DIR, f"progress_shard_{shard_idx}.log")
@@ -176,7 +177,7 @@ def record_window_complete(shard_idx, retention_day_str, window_end_str, stats):
             f"{stats['duration_h']:.2f}h | repos={stats['repos']:,} | "
             f"runs={stats['runs_discovered']:,} | jobs={stats['jobs']:,} | "
             f"steps={stats['steps']:,} | rest={stats['rest_calls']:,} | "
-            f"gql_pts={stats['gql_pts']:,}\n"
+            f"gql_pts={stats['gql_pts']:,} | gql_degraded={gql_degraded_responses:,}\n"
         )
 
     # Cross-shard summary
@@ -197,6 +198,7 @@ def record_window_complete(shard_idx, retention_day_str, window_end_str, stats):
             "steps": stats['steps'],
             "rest_calls": stats['rest_calls'],
             "gql_pts": stats['gql_pts'],
+            "gql_degraded_responses": gql_degraded_responses,
         }
 
     _write_summary_locked(update)

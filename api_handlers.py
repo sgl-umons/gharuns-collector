@@ -42,8 +42,14 @@ def handle_rate_limit(response, token=None, retry_count=0):
         except Exception:
             pass 
 
-        remaining = int(response.headers.get("X-RateLimit-Remaining", 0))
-        
+        # GitHub's secondary-limit 403 for GraphQL carries NO X-RateLimit-* headers, only
+        # "Retry-After" and a "You have exceeded a secondary rate limit" body. A missing
+        # X-RateLimit-Remaining must not be read as 0, otherwise every secondary limit is
+        # treated as primary and sleeps ~1 hour instead of the few minutes GitHub asks for.
+        # Primary only when GitHub explicitly reports Remaining == 0.
+        remaining_hdr = response.headers.get("X-RateLimit-Remaining")
+        remaining = int(remaining_hdr) if remaining_hdr is not None else None
+
         # 2. Primary Limit Exhausted
         if remaining == 0:
             reset_time = int(response.headers.get("X-RateLimit-Reset", time.time() + 3600))
@@ -57,18 +63,27 @@ def handle_rate_limit(response, token=None, retry_count=0):
             
         # 3. Secondary Limit Hit (CPU / Burst throttled)
         else:
-            # If we've retried 3 times and still getting 403 Secondary Limits, give up on this repo/page!
-            if retry_count >= 3:
-                tqdm.write("[!] Secondary limit persists after 3 retries. Skipping to avoid token ban.")
+            body = (response.text or "").lower()
+            is_secondary = (
+                remaining is None
+                or "Retry-After" in response.headers
+                or "secondary rate limit" in body
+            )
+            # Real secondary limits: be patient (Retry-After, doubling, capped at 1h) for up to
+            # 6 retries — giving up makes GraphQL split the batch (more requests) and can skip
+            # runs. Other 403s with quota left (e.g. permissions): 3 retries, then skip.
+            max_retries = 6 if is_secondary else 3
+            if retry_count >= max_retries:
+                tqdm.write(f"[!] Secondary limit persists after {max_retries} retries. Skipping to avoid token ban.")
                 with open('incomplete_data.log', 'a') as f:
                     f.write(f"{datetime.now().isoformat()},SECONDARY_LIMIT_ABORT,{response.url}\n")
                 return False # Break the loop, move on!
-            
+
             # Base sleep is either Retry-After or 60 seconds
             base_sleep = int(response.headers.get("Retry-After", 60))
-            
-            # Exponential backoff: 60s -> 120s -> 240s -> 480s
-            sleep_time = base_sleep * (2 ** retry_count) 
+
+            # Exponential backoff, capped at 1h (e.g. Retry-After 300: 300s -> 600s -> ... -> 3600s)
+            sleep_time = min(base_sleep * (2 ** retry_count), 3600)
             
             tqdm.write(f"       [!] SECONDARY RATE LIMIT HIT! (Retry {retry_count}). Sleeping for {sleep_time} seconds...")
             
@@ -194,9 +209,10 @@ def fetch_runs_rest(repo, window_start, window_end,token):
     return all_runs
 
 def fetch_jobs_and_steps_graphql(check_suite_node_ids, token):
-    if not check_suite_node_ids: 
-        return [], 0, 5000, True
-        
+    # Returns (nodes, cost, remaining, success, degraded)
+    if not check_suite_node_ids:
+        return [], 0, 5000, True, False
+
     query = f"""
     query($runIds: [ID!]!) {{
       rateLimit {{ cost remaining }}
@@ -250,32 +266,50 @@ def fetch_jobs_and_steps_graphql(check_suite_node_ids, token):
                     continue  
 
                 data = json_data.get('data') or {}
-                cost = data.get('rateLimit', {}).get('cost', 0)
-                remaining = data.get('rateLimit', {}).get('remaining', 5000)
-                
+                rate_limit = data.get('rateLimit')
+
+                # A null/missing rateLimit field means the query execution itself was
+                # degraded (internal error, timeout, untagged throttling, ...), which is a
+                # different failure than a per-node NOT_FOUND. Treat the WHOLE batch as a
+                # failure so the caller retries/splits, instead of proceeding with cost=0.
+                if rate_limit is None:
+                    tqdm.write(f"       [!] GraphQL degraded response (rateLimit missing). errors={json_data.get('errors')}")
+                    with open(config.BATCH_LOG_FILE, 'a', newline='') as f:
+                        csv.writer(f).writerow([datetime.now().strftime("%H:%M:%S"), len(check_suite_node_ids), f"{fetch_duration:.2f}", "FAILED GRAPHQL_DEGRADED", 0])
+                    return [], 0, 5000, False, True
+
+                cost = rate_limit.get('cost', 0)
+                remaining = rate_limit.get('remaining', 5000)
+
+                # Per-node errors (e.g. NOT_FOUND for a deleted check suite) are benign:
+                # GitHub returns null for that slot and the rest of the batch is fine.
+                # Downstream code already skips null nodes, so keep the batch as a success.
+                if "errors" in json_data:
+                    tqdm.write(f"       [!] GraphQL partial errors (benign, proceeding): {json_data['errors']}")
+
                 with open(config.BATCH_LOG_FILE, 'a', newline='') as f:
                     csv.writer(f).writerow([datetime.now().strftime("%H:%M:%S"), len(check_suite_node_ids), f"{fetch_duration:.2f}", "SUCCESS", cost])
-                
+
                 # If remaining is critically low according to the payload, pause.
                 if remaining < 10:
                     tqdm.write(f"       [!] GQL ALMOST OUT OF QUOTA ({remaining} left). Sleeping 60s...")
                     time.sleep(60)
-                    
-                return data.get('nodes', []), cost, remaining, True
+
+                return data.get('nodes') or [], cost, remaining, True, False
             else:
                 # This handles the 502/504 errors! It returns instantly to trigger the split.
                 tqdm.write(f"       [!] API 2 Error: {response.status_code}")
                 with open(config.BATCH_LOG_FILE, 'a', newline='') as f:
                     csv.writer(f).writerow([datetime.now().strftime("%H:%M:%S"), len(check_suite_node_ids), f"{fetch_duration:.2f}", f"FAILED {response.status_code}", 0])
-                return [], 0, 5000, False
-                
+                return [], 0, 5000, False, False
+
         except requests.exceptions.ReadTimeout:
             # Fail fast on timeout! Do not retry. Trigger split immediately.
             fetch_duration = time.time() - batch_start_time
             tqdm.write("       [!] Network Exception: ReadTimeout (Payload too big). Triggering split...")
             with open(config.BATCH_LOG_FILE, 'a', newline='') as f:
                 csv.writer(f).writerow([datetime.now().strftime("%H:%M:%S"), len(check_suite_node_ids), f"{fetch_duration:.2f}", "TIMEOUT", 0])
-            return [], 0, 5000, False
+            return [], 0, 5000, False, False
             
         except requests.exceptions.RequestException as e:
             # Only genuine connection errors consume the retry budget
@@ -292,33 +326,43 @@ def fetch_jobs_and_steps_graphql(check_suite_node_ids, token):
     tqdm.write(f"       [!] GQL connection retries exhausted for batch of {len(check_suite_node_ids)} IDs. Batch aborted.")
     with open('incomplete_data.log', 'a') as f:
         f.write(f"{datetime.now().isoformat()},GQL_CONNECTION_RETRIES_EXHAUSTED,batch_size_{len(check_suite_node_ids)}\n")
-    return [], 0, 5000, False
+    return [], 0, 5000, False, False
+
+# Count of failed GraphQL attempts (502/504/timeout/degraded) across the process.
+# main.py compares it before/after each batch to adapt the batch size.
+GQL_FAILED_ATTEMPTS = 0
+
 
 def fetch_with_dynamic_resizing(batch_ids, token):
-    nodes, cost, remaining, success = fetch_jobs_and_steps_graphql(batch_ids, token)
-    
+    """Returns (nodes, cost, remaining, degraded_response_count)."""
+    global GQL_FAILED_ATTEMPTS
+    nodes, cost, remaining, success, gql_error = fetch_jobs_and_steps_graphql(batch_ids, token)
+    gql_error_count = 1 if gql_error else 0
+
     # If it succeeded (even with zero nodes), return immediately
-    if success: 
-        return nodes, cost, remaining
-        
+    if success:
+        return nodes, cost, remaining, gql_error_count
+
+    GQL_FAILED_ATTEMPTS += 1
+
     # If it failed AND we can still split it
     if len(batch_ids) > 1:
         mid = len(batch_ids) // 2
         tqdm.write(f"       Split triggered for {len(batch_ids)} runs...")
-        nodes1, cost1, rem1 = fetch_with_dynamic_resizing(batch_ids[:mid], token)
-        nodes2, cost2, rem2 = fetch_with_dynamic_resizing(batch_ids[mid:], token)
+        nodes1, cost1, rem1, err1 = fetch_with_dynamic_resizing(batch_ids[:mid], token)
+        nodes2, cost2, rem2, err2 = fetch_with_dynamic_resizing(batch_ids[mid:], token)
         combined = nodes1 + nodes2
         recovered = len([n for n in combined if n])
         tqdm.write(f"       Split result for {len(batch_ids)} runs: recovered {recovered}/{len(batch_ids)} nodes.")
-        return combined, cost1 + cost2, min(rem1, rem2)
-        
+        return combined, cost1 + cost2, min(rem1, rem2), gql_error_count + err1 + err2
+
     # If it failed and length is exactly 1, SKIP IT to prevent infinite loop.
     else:
         tqdm.write(f"   [!] PERMANENT FAILURE: Skipping un-fetchable run ID {batch_ids[0]}")
         # Log this skipped ID to a file so you can investigate it later!
         with open('skipped_runs.txt', 'a') as f:
             f.write(f"{batch_ids[0]}\n")
-        return [], 0, remaining
+        return [], 0, remaining, gql_error_count
     
 def fetch_massive_run_rest(jobs_url, token):
 
