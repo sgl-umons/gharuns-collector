@@ -14,7 +14,7 @@ A large-scale data extraction pipeline designed to collect massive datasets (GHA
 Mining GitHub Actions workflows run metadata at scale is severely constrained by GitHub's strict rate limits and rolling log retention policies. To overcome this, this tool utilizes an optimized **two-phase extraction architecture** with a REST fallback cleanup phase for edge cases. 
 
 <p align="center">
-  <img src="docs/gharuns-pipeline.pdf" alt="The GHARuns collection pipeline." width="1200">
+  <img src="docs/gharuns-pipeline.svg" alt="The GHARuns collection pipeline." width="1200">
 </p>
 
 <p align="center">
