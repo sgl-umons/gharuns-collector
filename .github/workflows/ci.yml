@@ -31,7 +31,7 @@ jobs:
         
     - name: Lint with Ruff
       run: |
-        ruff check .
+        ruff check --select E4,E7,E9,F .
         
     - name: Test with pytest
       run: |
