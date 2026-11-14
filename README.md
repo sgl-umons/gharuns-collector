@@ -1,10 +1,10 @@
 # GHARuns Collector
 
 <!-- [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20427454.svg)](https://doi.org/10.5281/zenodo.XXXXXXX) -->
-[![Tests](https://github.com/aref98/GHA_run_metadata/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/aref98/GHA_run_metadata/actions/workflows/ci.yml)
+[![Tests](https://github.com/sgl-umons/gharuns-collector/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sgl-umons/gharuns-collector/actions/workflows/ci.yml)
 [![Dependabot](https://badgen.net/badge/Dependabot/enabled/green?icon=dependabot)](https://dependabot.com/)
 [![License: LGPL v3](https://img.shields.io/badge/License-LGPL%20v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
-[![Last Commit](https://img.shields.io/github/last-commit/aref98/GHA_run_metadata)](https://github.com/aref98/GHA_run_metadata/commits/main)
+[![Last Commit](https://img.shields.io/github/last-commit/sgl-umons/gharuns-collector)](https://github.com/sgl-umons/gharuns-collector/commits/main)
 
 [![archived repository](https://img.shields.io/badge/archived-repository-orange)](https://archive.softwareheritage.org/swh:1:dir:5eea687b596faf11a1f199260dd2e3d3d336434c;origin=https://github.com/sgl-umons/gharuns-collector)
 
